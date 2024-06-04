@@ -1,0 +1,200 @@
+# set env
+# 设置自定义文件路径
+description: Generate test data
+custom_function: keyword_custom_func.extract_variables
+custom_variation_generators:
+  azure_variation_generator:
+    class: azure_variation_generator.AzureVariationGenerator
+    config_cls: azure_variation_generator_config.AzureVariationGeneratorConfig
+custom_evaluators:
+  azure_evaluator:
+    class: azure_evaluator.AzureEvaluator
+    config_cls: azure_evaluator_config.AzureEvaluatorConfig
+# custom_enhancers:
+#   azure_pe2_enhancer:
+#     class: azure_pe2_enhancer.PE2Enhancer
+#     config_cls: azure_enhancer_config.PE2EnhancerConfig
+custom_enhancers:
+  azure_opro:
+    class: azure_opro_enhancer.OptimizeByPromptEnhancer
+    config_cls: azure_enhancer_config.OptimizeByPromptEnhancerConfig
+dataset:
+  file_path: 端午节问候关键词.csv
+  reader: csv_reader
+  source_type: dataset
+
+# 生成不同的prompt作为不同的实验环境
+variations:
+  - name: task
+    variations:
+    # [INPUT] variations初始指令，简要写明任务目的即可
+      - instantiated_value: 写一段关于 {keyword} 的问候语, 50字左右。
+        value: 写一段关于 {keyword} 的问候语, 50字左右。
+        value_type: str
+        variation_id: null
+    generator_name: azure_variation_generator
+    generator_config:
+      # [INPUT] 定义模型
+      model_name: xxxx
+      # [INPUT] 定义实验环境数量
+      number_of_variations: 5
+      diversify: true
+      variables: null
+      prompt: 
+      # [INPUT] 大模型提示词微调的核心指令，明确定义任务目标，所需变量及变量含义
+        - content: |-
+            您的目标是为gpt-4构建一个简洁的中文指令提示。指令需强调以下几点：
+            - 给定一个关键词，生成一段独特且引人入胜的中文文字，能引起中国读者的共鸣。
+            - 创造最吸引人的句子，并与关键词保持相关性。
+            - 文字长度必须在50字左右。
+            - {keyword} 代表读者提供的词语。
+            - 保持输出简洁：仅包含提示内容，无任何多余内容。
+          role: system
+
+# 对生成结果的评估
+evaluators:
+  # [INPUT] 基于任务需求可定义多个不同维度的evaluators 
+  - evaluator_type: individual
+    metric_calculators:
+      - method: AVERAGE
+    name: azure_evaluator
+    # [INPUT] 定义维度指标
+    display_name: sincerity
+    # [INPUT] evaluator评估过程中核心指令，明确评估框架
+    prompt: |-
+      你正在根据一个标准评估提交的答案。以下是数据：
+      - 任务：给定一个关键词，生成一段与关键词相关的中文文本。
+      - 这段祝福语是否真诚地表达了情感和祝福？
+      一般来说，真诚的祝福语会让人感到温暖、感动、或者让人感到被关怀。        
+      [输入]: 关键词: {keyword}
+      [结果]: {raw_output}
+      请从以下选项中选择一个来回答问题：
+      A 完全不符合标准。
+      B 有些符合标准，但仍有很大的提升空间。
+      C 满足标准到一个令人满意的程度。
+      D 很好地符合标准。
+      E 非常好地符合标准，几乎没有提升空间。      
+    choices: ["A", "B", "C", "D", "E"]
+    # [INPUT] 定义模型
+    model_name: xxxx
+    description: "evaluate the sincerity of the text"
+    scale_description: "0-4"
+    choice_scores:
+      A: 0
+      B: 1
+      C: 2
+      D: 3
+      E: 4
+  
+  - evaluator_type: individual
+    metric_calculators:
+      - method: AVERAGE
+    name: azure_evaluator
+    display_name: attractiveness
+    prompt: |-
+      你正在根据一个标准评估提交的答案。以下是数据：
+      - 任务：给定一个关键词，生成一段与关键词相关的中文文本。
+      - 这段文字是否吸引人或者让人读后印象深刻，让人想转发或分享？
+      一般来说，吸引人的文字会让人产生共鸣，或者让人感到有趣、有启发。
+      [输入]: 关键词: {keyword}
+      [结果]: {raw_output}
+      请从以下选项中选择一个来回答问题：
+      A 完全不符合标准。
+      B 有些符合标准，但仍有很大的提升空间。
+      C 基本符合标准，但可以更有趣和吸引人。
+      D 满足标准到一个令人满意的程度。
+      E 非常好地符合标准。
+    description: Is the text attractive?
+    scale_description: "0-4"
+    choices: ["A", "B", "C", "D", "E"]
+    choice_scores:
+      A: 0
+      B: 1
+      C: 2
+      D: 3
+      E: 4
+  
+  - evaluator_type: individual
+    metric_calculators:
+      - method: AVERAGE
+    name: azure_evaluator
+    display_name: conciseness
+    prompt: |-
+      你正在根据一个标准评估提交的答案。以下是数据：
+      - 任务：给定一个关键词，生成一段与关键词相关的中文文本。
+      - 这段祝福语是否没有冗长的内容或复杂的逻辑，且可以让中文水平一般的读者容易一次读懂？
+      一般来说，简洁的文字会让人感到清晰、易懂、容易记忆。
+      [输入]: 关键词: {keyword}
+      [结果]: {raw_output}
+      请从以下选项中选择一个来回答问题：
+      A 完全不符合标准。
+      B 有些符合标准，但仍有很大的提升空间。
+      C 满足标准到一个令人满意的程度。
+      D 很好地符合标准。
+      E 非常好地符合标准，几乎没有提升空间。
+    description: Is the text relevant to the keyword?
+    scale_description: "0-4"
+    choices: ["A", "B", "C", "D", "E"]
+    choice_scores:
+      A: 0
+      B: 1
+      C: 2
+      D: 3
+      E: 4
+
+# 选择合适的prompt
+selection_strategy:
+  ahp_selection:
+    # [INPUT] 定义评分计算所需指标
+    criteria:
+      - "openai_prompt_based_evaluator: sincerity"
+      - "openai_prompt_based_evaluator: attractiveness"
+      - "openai_prompt_based_evaluator: conciseness"
+      - average_token_usage
+      - average_latency
+    # [INPUT] 定义优化方向
+    criteria_maximization:
+      "openai_prompt_based_evaluator: sincerity": true
+      "openai_prompt_based_evaluator: attractiveness" : true
+      "openai_prompt_based_evaluator: conciseness" : true
+      average_latency: false
+      average_token_usage: false
+    # [INPUT] 定义指标权重
+    criteria_weights:
+      "openai_prompt_based_evaluator: sincerity": 0.3
+      "openai_prompt_based_evaluator: attractiveness" : 0.4
+      "openai_prompt_based_evaluator: conciseness" : 0.3
+      average_latency: 0.0
+      average_token_usage: 0.0
+    # normalize_func: "z-score"
+
+# 涉及UI问题，暂时不可用
+human_rating_configs:
+  - name: comprehensibility
+    instructions: Rate the degree to which the headline is easy to understand.
+    scale: [1, 5]
+
+# enhancer:
+#   name: "azure_pe2_enhancer"
+#   enable_prompt_instruction: true
+#   enhance_var: ["task"]
+#   max_iterations: 6
+#   full_prompt_description: "prompt.format(keyword=keyword)"
+
+# 结果反馈，下一轮优化
+enhancer:
+  name: "azure_opro"
+  # [INPUT] 定义模型
+  model_name: "xxxx"
+  # [INPUT] 优化最大迭代次数
+  max_iterations: 10
+  enhance_var: ["task"]
+  # [INPUT] 提示llm提示词生成任务目标，明确优化方向
+  head_meta_instruction: |
+    现在您将帮助我生成一个提示，用于生成一段独特且引人入胜的中文文字，该文字能够引起中国读者的共鸣，并基于关键词 [keyword]。
+    您应该尽可能创造出最优美的句子，并保持与关键词 [keyword] 的紧密相关性。
+    文字长度必须在50个字左右。
+    我已经有一些提示及其评估结果：
+    
+  end_meta_instruction: |
+    给我一个与以上所有提示都不同的新提示，并且其评估值高于以上任何一个。
